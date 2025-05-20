@@ -179,7 +179,7 @@ class _HomePageState extends State<HomePage> {
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Text(
                     task == null ? "Create Task" : "Update Task",
-                    style: const TextStyle(color: Colors.white,),
+                    style: const TextStyle(color: Colors.white),
                   ),
                 ),
               ),
@@ -274,25 +274,34 @@ class _HomePageState extends State<HomePage> {
                         MediaQuery.of(context).size.width > 600 ? 200 : 24,
                     vertical: 32,
                   ),
-                  child: ListView.builder(
-                    itemCount: tasks.length,
-                    itemBuilder: (context, index) {
-                      final task = tasks[index];
-                      final taskOwnerId = task.userId ?? '';
-                      return TaskTile(
-                        task: task,
-                        username:
-                            taskOwnerId == currentUserId ? username : 'User',
-                        currentUserId: currentUserId,
-                        onEdit: () => _editTask(task),
-                        onDelete:
-                            () => _deleteTask(
-                              task,
-                              _token!,
-                              context.read<TaskCubit>(),
-                            ),
-                      );
+                  child: RefreshIndicator(
+                    onRefresh: () async {
+                      final prefs = await SharedPreferences.getInstance();
+                      final token = prefs.getString('jwt_token');
+                      if (token != null) {
+                        await context.read<TaskCubit>().fetchTasks(token);
+                      }
                     },
+                    child: ListView.builder(
+                      itemCount: tasks.length,
+                      itemBuilder: (context, index) {
+                        final task = tasks[index];
+                        final taskOwnerId = task.userId ?? '';
+                        return TaskTile(
+                          task: task,
+                          username:
+                              taskOwnerId == currentUserId ? username : 'User',
+                          currentUserId: currentUserId,
+                          onEdit: () => _editTask(task),
+                          onDelete:
+                              () => _deleteTask(
+                                task,
+                                _token!,
+                                context.read<TaskCubit>(),
+                              ),
+                        );
+                      },
+                    ),
                   ),
                 );
               },
