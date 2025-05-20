@@ -9,7 +9,6 @@ const authRoutes = require("./routes/auth");
 const taskRoutes = require("./routes/tasks");
 const { verifyJWT } = require("./middleware/auth");
 const userRoutes = require("./routes/user");
-const cors = require("cors");
 
 const app = express();
 const server = http.createServer(app);
