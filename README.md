@@ -1,16 +1,29 @@
 # task_manager_flutter_nodejs
 
-A new Flutter project.
+A Flutter project using Bloc Cubit for state management, integrating with a Node.js backend with WebSocket support.
 
-## Getting Started
+## Overview
 
-This project is a starting point for a Flutter application.
+This app is built with:
 
-A few resources to get you started if this is your first Flutter project:
+- **Bloc Cubit** for managing state in a clean and scalable way.
+- **socket_io_client** for real-time communication with the backend via WebSockets.
+- **shared_preferences** for local storage of JWT tokens and other small data.
+- **http** for REST API calls.
+- **cupertino_icons** for iOS-style icons.
+- **timeago** and **intl** for displaying and formatting timestamps.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## Dependencies
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+The following dependencies are used in this project:
+
+```yaml
+dependencies:
+  flutter_bloc: ^9.1.1
+  socket_io_client: ^3.1.2
+  shared_preferences: ^2.5.3
+  http: ^1.4.0
+  cupertino_icons: ^1.0.8
+  timeago: ^3.7.1
+  intl: ^0.20.2
+```
