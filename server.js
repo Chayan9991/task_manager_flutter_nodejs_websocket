@@ -9,11 +9,22 @@ const authRoutes = require("./routes/auth");
 const taskRoutes = require("./routes/tasks");
 const { verifyJWT } = require("./middleware/auth");
 const userRoutes = require("./routes/user");
+const cors = require("cors");
 
 const app = express();
 const server = http.createServer(app);
+
+app.use(
+  cors({
+    origin: "*",
+  })
+);
+
 const io = new Server(server, {
-  cors: { origin: "*" },
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST", "DELETE", "PUT"],
+  },
 });
 
 // Middleware
