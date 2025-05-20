@@ -5,9 +5,14 @@ const router = express.Router();
 
 //get all task
 router.get("/", async (req, res) => {
-  const tasks = await Task.find();
-  res.json(tasks);
+  try {
+    const tasks = await Task.find().populate('user', 'name'); 
+    res.json(tasks);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch tasks' });
+  }
 });
+
 
 // Create task
 router.post("/", async (req, res) => {
