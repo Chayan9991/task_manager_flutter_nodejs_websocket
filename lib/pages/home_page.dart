@@ -38,21 +38,20 @@ class _HomePageState extends State<HomePage> {
         _token = token;
       });
 
-      // Fetch user info
-      context.read<UserCubit>().fetchUser();
-
-      // Fetch tasks
-      await context.read<TaskCubit>().fetchTasks(token);
-
-      // Get current state of TaskCubit
-      final taskState = context.read<TaskCubit>().state;
-      if (taskState is TaskLoaded) {
-        for (var task in taskState.tasks) {
-          print('Fetched Task: ${task.title} (ID: ${task.id})');
-        }
-      }
+      // Fetch user info and tasks concurrently
+      await Future.wait([
+        context.read<UserCubit>().fetchUser(),
+        context.read<TaskCubit>().initializeTasksAndSocket(
+          token,
+        ), //this is responsible for websocket init
+      ]);
     } catch (e) {
-      print('Error fetching data in HomePage: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading data: $e'),
+          backgroundColor: Colors.red.shade400,
+        ),
+      );
     }
   }
 
@@ -67,7 +66,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _deleteTask(Task task, String token, TaskCubit taskCubit) {
-    print('Delete task: ${task.title}');
     taskCubit.deleteTask(task.id, token);
   }
 
@@ -77,114 +75,225 @@ class _HomePageState extends State<HomePage> {
       text: task?.description ?? '',
     );
     TaskStatus selectedStatus = task?.status ?? TaskStatus.pending;
+    String? titleError;
+    String? descriptionError;
+
+    bool validateInputs() {
+      titleError =
+          titleController.text.trim().isEmpty ? 'Title is required' : null;
+      descriptionError =
+          descriptionController.text.trim().isEmpty
+              ? 'Description is required'
+              : null;
+      return titleError == null && descriptionError == null;
+    }
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      backgroundColor: Colors.white,
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 24,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                task == null ? 'Add Task' : 'Edit Task',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AnimatedOpacity(
+              opacity: 1.0,
+              duration: const Duration(milliseconds: 300),
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 24,
+                  right: 24,
+                  top: 24,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 24,
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Title',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: descriptionController,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<TaskStatus>(
-                value: selectedStatus,
-                decoration: const InputDecoration(
-                  labelText: 'Status',
-                  border: OutlineInputBorder(),
-                ),
-                items:
-                    TaskStatus.values.map((status) {
-                      return DropdownMenuItem(
-                        value: status,
-                        child: Text(Task.statusToString(status)),
-                      );
-                    }).toList(),
-                onChanged: (status) {
-                  if (status != null) selectedStatus = status;
-                },
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
-                ),
-                onPressed: () async {
-                  final prefs = await SharedPreferences.getInstance();
-                  final token = prefs.getString('jwt_token');
-                  final userState = context.read<UserCubit>().state;
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      task == null ? 'Add Task' : 'Edit Task',
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    TextField(
+                      controller: titleController,
+                      decoration: InputDecoration(
+                        labelText: 'Title',
+                        labelStyle: TextStyle(color: Colors.grey.shade600),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: Colors.green.shade400,
+                            width: 2,
+                          ),
+                        ),
+                        errorText: titleError,
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: descriptionController,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        labelText: 'Description',
+                        labelStyle: TextStyle(color: Colors.grey.shade600),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: Colors.green.shade400,
+                            width: 2,
+                          ),
+                        ),
+                        errorText: descriptionError,
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<TaskStatus>(
+                      value: selectedStatus,
+                      decoration: InputDecoration(
+                        labelText: 'Status',
+                        labelStyle: TextStyle(color: Colors.grey.shade600),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: Colors.green.shade400,
+                            width: 2,
+                          ),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                      items:
+                          TaskStatus.values.map((status) {
+                            return DropdownMenuItem(
+                              value: status,
+                              child: Text(
+                                Task.statusToString(status),
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                            );
+                          }).toList(),
+                      onChanged: (status) {
+                        if (status != null) {
+                          setState(() {
+                            selectedStatus = status;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    Center(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade400,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 32,
+                            vertical: 16,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 2,
+                          shadowColor: Colors.black.withOpacity(0.2),
+                        ),
+                        onPressed: () async {
+                          setState(() {
+                            validateInputs();
+                          });
+                          if (!validateInputs()) return;
 
-                  if (token != null && userState is UserLoaded) {
-                    final updatedTask = Task(
-                      id: task?.id ?? '',
-                      title: titleController.text,
-                      description: descriptionController.text,
-                      status: selectedStatus,
-                      userId: userState.id,
-                      createdAt: task?.createdAt ?? DateTime.now(),
-                      updatedAt: DateTime.now(),
-                    );
+                          final prefs = await SharedPreferences.getInstance();
+                          final token = prefs.getString('jwt_token');
+                          final userState = context.read<UserCubit>().state;
 
-                    if (task == null) {
-                      // Create new task
-                      await context.read<TaskCubit>().createTask(
-                        updatedTask,
-                        token,
-                      );
-                    } else {
-                      // Update existing task
-                      await context.read<TaskCubit>().updateTask(
-                        updatedTask,
-                        token,
-                      );
-                    }
+                          if (token != null && userState is UserLoaded) {
+                            final updatedTask = Task(
+                              id: task?.id ?? '',
+                              title: titleController.text.trim(),
+                              description: descriptionController.text.trim(),
+                              status: selectedStatus,
+                              userId: userState.id,
+                              createdAt: task?.createdAt ?? DateTime.now(),
+                              updatedAt: DateTime.now(),
+                            );
 
-                    Navigator.of(context).pop();
-                  }
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    task == null ? "Create Task" : "Update Task",
-                    style: const TextStyle(color: Colors.white),
-                  ),
+                            if (task == null) {
+                              await context.read<TaskCubit>().createTask(
+                                updatedTask,
+                                token,
+                              );
+                            } else {
+                              await context.read<TaskCubit>().updateTask(
+                                updatedTask,
+                                token,
+                              );
+                            }
+
+                            Navigator.of(context).pop();
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text(
+                                  'Failed to authenticate. Please log in again.',
+                                ),
+                                backgroundColor: Colors.red.shade400,
+                              ),
+                            );
+                          }
+                        },
+                        child: Text(
+                          task == null ? 'Create Task' : 'Update Task',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -201,10 +310,10 @@ class _HomePageState extends State<HomePage> {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
         ),
-        title: const Text(
+        title: Text(
           "Task Manager",
           style: TextStyle(
-            color: Colors.deepPurple,
+            color: Colors.green[400],
             fontWeight: FontWeight.bold,
             fontSize: 22,
           ),
@@ -213,27 +322,70 @@ class _HomePageState extends State<HomePage> {
         actions: [
           BlocBuilder<UserCubit, UserState>(
             builder: (context, state) {
-              String name = '';
+              String initials = '';
+              String fullName = '';
               if (state is UserLoaded && state.name.isNotEmpty) {
-                name = state.name.substring(0, 2).toUpperCase();
+                fullName = state.name;
+                initials =
+                    state.name
+                        .trim()
+                        .split(' ')
+                        .map((word) => word[0])
+                        .take(2)
+                        .join()
+                        .toUpperCase();
               }
 
               return Padding(
-                padding: const EdgeInsets.only(right: 16.0),
+                padding: EdgeInsets.only(
+                  right: MediaQuery.of(context).size.width > 600 ? 32.0 : 16.0,
+                ),
                 child: PopupMenuButton<String>(
                   tooltip: "User Menu",
+                  offset: const Offset(0, 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 8,
                   onSelected: (value) {
                     if (value == 'logout') _logout();
                   },
                   itemBuilder:
-                      (context) => const [
-                        PopupMenuItem(value: 'logout', child: Text('Logout')),
+                      (context) => [
+                        PopupMenuItem<String>(
+                          enabled: false,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                fullName.isNotEmpty ? fullName : 'User',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color: Colors.green.shade400,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              const Divider(),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem<String>(
+                          value: 'logout',
+                          child: Row(
+                            children: [
+                              Icon(Icons.logout, color: Colors.green.shade400),
+                              const SizedBox(width: 10),
+                              const Text("Logout"),
+                            ],
+                          ),
+                        ),
                       ],
                   child: CircleAvatar(
                     radius: 20,
-                    backgroundColor: Colors.deepPurple,
+                    backgroundColor: Colors.green.shade400,
                     child: Text(
-                      name,
+                      initials.isNotEmpty ? initials : '?',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -246,7 +398,6 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-
       body: BlocBuilder<TaskCubit, TaskState>(
         builder: (context, state) {
           if (state is TaskLoading) {
@@ -268,6 +419,10 @@ class _HomePageState extends State<HomePage> {
                   username = userState.name;
                 }
 
+                // --- IMPORTANT CHANGE HERE ---
+                // Reverse the tasks list to display the last as first
+                final reversedTasks = tasks.reversed.toList();
+
                 return Padding(
                   padding: EdgeInsets.symmetric(
                     horizontal:
@@ -283,20 +438,18 @@ class _HomePageState extends State<HomePage> {
                       }
                     },
                     child: ListView.builder(
-                      itemCount: tasks.length,
+                      itemCount: reversedTasks.length,
                       itemBuilder: (context, index) {
-                        final task = tasks[index];
-                        final taskOwnerId = task.userId ?? '';
+                        final task = reversedTasks[index];
                         return TaskTile(
                           task: task,
-                          username:
-                              taskOwnerId == currentUserId ? username : 'User',
+                          username: task.userName ?? 'User',
                           currentUserId: currentUserId,
                           onEdit: () => _editTask(task),
                           onDelete:
                               () => _deleteTask(
                                 task,
-                                _token!,
+                                _token ?? '',
                                 context.read<TaskCubit>(),
                               ),
                         );
@@ -315,7 +468,7 @@ class _HomePageState extends State<HomePage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddTaskModal,
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: Colors.green.shade400,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );

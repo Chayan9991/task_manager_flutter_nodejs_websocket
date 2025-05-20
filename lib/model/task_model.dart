@@ -5,7 +5,8 @@ class Task {
   final String title;
   final String description;
   final TaskStatus status;
-  final String userId;
+  final String? userId;
+  final String? userName;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -14,18 +15,35 @@ class Task {
     required this.title,
     required this.description,
     required this.status,
-    required this.userId,
+    this.userId,
+    this.userName,
     required this.createdAt,
     required this.updatedAt,
   });
 
   factory Task.fromJson(Map<String, dynamic> json) {
+    // Safely extract user information
+    String? extractedUserId;
+    String? extractedUserName;
+
+    final user = json['user'];
+    if (user != null) {
+      if (user is Map<String, dynamic>) {
+        // Case 1: user is a populated object (e.g., from GET /tasks)
+        extractedUserId = user['_id'] as String?;
+        extractedUserName = user['name'] as String?;
+      } else if (user is String) {
+        extractedUserId = user;
+      }
+    }
+
     return Task(
       id: json['_id'] as String,
       title: json['title'] as String,
       description: json['description'] as String,
       status: _statusFromString(json['status'] as String),
-      userId: json['user'] as String,
+      userId: extractedUserId, // Use the safely extracted userId
+      userName: extractedUserName, // Use the safely extracted userName
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
@@ -36,7 +54,7 @@ class Task {
       'title': title,
       'description': description,
       'status': statusToString(status),
-      'user': userId,
+      'user': userId, 
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };

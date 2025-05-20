@@ -30,7 +30,6 @@ class LandingPage extends StatelessWidget {
             infoMessage: "Registration successful! Please login.",
           );
         } else {
-          // Default fallback to login page
           return LoginForm();
         }
       },

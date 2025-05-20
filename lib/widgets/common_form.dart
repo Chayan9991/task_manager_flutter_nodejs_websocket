@@ -7,19 +7,21 @@ class CommonFormField extends StatefulWidget {
   final String? Function(String?)? validator;
   final TextInputType? keyboardType;
   final IconData? prefixIcon;
+  final Iterable<String>? autofillHints;
 
   const CommonFormField({
-    Key? key,
+    super.key,
     required this.controller,
     required this.label,
     this.isPassword = false,
     this.validator,
     this.keyboardType,
     this.prefixIcon,
-  }) : super(key: key);
+    this.autofillHints,
+  });
 
   @override
-  _CommonFormFieldState createState() => _CommonFormFieldState();
+  State<CommonFormField> createState() => _CommonFormFieldState();
 }
 
 class _CommonFormFieldState extends State<CommonFormField> {
@@ -44,23 +46,34 @@ class _CommonFormFieldState extends State<CommonFormField> {
       obscureText: _obscureText,
       validator: widget.validator,
       keyboardType: widget.keyboardType,
+      autofillHints: widget.autofillHints,
       decoration: InputDecoration(
-        filled: true,
-        fillColor: const Color(0xFFF3E5F5),
         labelText: widget.label,
-        prefixIcon: widget.prefixIcon != null ? Icon(widget.prefixIcon) : null,
-        suffixIcon: widget.isPassword
-            ? IconButton(
-                icon: Icon(
-                  _obscureText ? Icons.visibility_off : Icons.visibility,
-                ),
-                onPressed: _toggleObscure,
-              )
-            : null,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
+        prefixIcon:
+            widget.prefixIcon != null
+                ? Icon(
+                  widget.prefixIcon,
+                  color: Theme.of(context).iconTheme.color,
+                )
+                : null,
+        suffixIcon:
+            widget.isPassword
+                ? IconButton(
+                  icon: Icon(
+                    _obscureText ? Icons.visibility_off : Icons.visibility,
+                    color: Theme.of(context).iconTheme.color,
+                  ),
+                  onPressed: _toggleObscure,
+                )
+                : null,
+        filled: Theme.of(context).inputDecorationTheme.filled,
+        fillColor: Theme.of(context).inputDecorationTheme.fillColor,
+        border: Theme.of(context).inputDecorationTheme.border,
+        enabledBorder: Theme.of(context).inputDecorationTheme.enabledBorder,
+        focusedBorder: Theme.of(context).inputDecorationTheme.focusedBorder,
+        errorBorder: Theme.of(context).inputDecorationTheme.errorBorder,
+        focusedErrorBorder:
+            Theme.of(context).inputDecorationTheme.focusedErrorBorder,
       ),
     );
   }
